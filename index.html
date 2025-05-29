@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Martin's Cafe</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="body.css" />
+</head>
+<body class="modo-visitante">
+  <header class="header">
+    <div class="logo" id="logoContainer">
+      <img src="img/logo.png" alt="Logo" class="logo-img" id="logoPreview" />
+      <img src="img/logotipo-puro.png" alt="Martin's Cafe" style="height: 32px;" />
+    </div>
+    <button id="editarCartaBtn" type="button" onclick="solicitarAcceso()">Editar Carta</button>
+  </header>
+
+  <section class="hero">
+    <div class="hero-img" id="heroImg"></div>
+    <div class="hero-text">
+      <p>El mejor plan<br />está en <span class="highlight">Martin's</span></p>
+    </div>
+  </section>
+
+  <section class="promociones">
+    <h2>Promociones</h2>
+    <p>Promociones del mes</p>
+    <div class="promo-grid" id="promoContainer"></div>
+  </section>
+
+  <section class="menu1">
+    <h2>Para comer</h2>
+    <p>Disfrutá nuestros postres artesanales recién horneados</p>
+    <div class="menu1-grid" id="comidaContainer"></div>
+  </section>
+
+  <section class="menu2">
+    <h2>Para tomar</h2>
+    <p>Cafés, tés y bebidas especiales para cada momento</p>
+    <div class="menu2-grid" id="bebidaContainer"></div>
+  </section>
+
+  <footer>
+    <p>Rondeau 1999, Córdoba, Argentina</p>
+    <div class="socials">
+      <img src="img/instagram.png" alt="Instagram" />
+      <img src="img/mail.png" alt="Email" />
+      <img src="img/whatsapp.png" alt="WhatsApp" />
+    </div>
+  </footer>
+
+  <script>
+    const defaultData = {
+      promo: [{ nombre: "2x1 en café", descripcion: "Dos cafés por el precio de uno los martes", precio: "", img: "" }],
+      comida: [{ nombre: "Cheesecake", descripcion: "Porción individual", precio: "3.00", img: "" }],
+      bebida: [{ nombre: "Café Latte", descripcion: "Café con leche", precio: "3.00", precioBase: 3.00, tamanio: "peque", img: "" }]
+    };
+
+    let data = JSON.parse(localStorage.getItem("menuData")) || structuredClone(defaultData);
+    let modoEdicion = false;
+    const usuarioLogueado = false;
+    document.body.classList.toggle('modo-visitante', !usuarioLogueado);
+
+    Object.keys(data).forEach(tipo =>
+      data[tipo].forEach(item => {
+        if (item.precio && !item.precioBase) item.precioBase = parseFloat(item.precio);
+        if (!item.tamanio && tipo === "bebida") item.tamanio = "peque";
+      })
+    );
+
+    function guardarData() {
+      localStorage.setItem("menuData", JSON.stringify(data));
+    }
+
+    function calcularPrecioConTamanio(base, tamanio) {
+      if (tamanio === "med") return (base * 1.165).toFixed(2);
+      if (tamanio === "gran") return (base * 1.33).toFixed(2);
+      return base.toFixed(2);
+    }
+
+    function renderItems(tipo) {
+      const container = document.getElementById(`${tipo}Container`);
+      container.innerHTML = "";
+
+      data[tipo].forEach((item, index) => {
+        const div = document.createElement("div");
+        div.className = tipo === "promo" ? "promo-card" : "item";
+
+        let contenido = `
+          ${modoEdicion ? `<input type="file" style="display:none" accept="image/*" onchange="cambiarImagen(event, '${tipo}', ${index})">` : ""}
+          <div class="img" style="background-image:url('${item.img || "img/default.png"}')" ${modoEdicion ? `onclick="this.previousElementSibling.click()"` : ""}></div>
+          <p contenteditable="${modoEdicion}" oninput="actualizarTexto('${tipo}', ${index}, 'nombre', this.innerText)">${item.nombre}</p>
+          <p contenteditable="${modoEdicion}" oninput="actualizarTexto('${tipo}', ${index}, 'descripcion', this.innerText)">${item.descripcion}</p>`;
+
+        if (tipo !== "promo") {
+          contenido += `
+            <p class="precio" ${modoEdicion ? `contenteditable="true" onblur="actualizarPrecio('${tipo}', ${index}, this.innerText)"` : ""}>$${item.precio}</p>`;
+          
+          if (tipo === "bebida") {
+            contenido += `
+              <select onchange="cambiarTamanio('${tipo}', ${index}, this.value)">
+                <option value="peque" ${item.tamanio === "peque" ? "selected" : ""}>Pequeño</option>
+                <option value="med" ${item.tamanio === "med" ? "selected" : ""}>Mediano</option>
+                <option value="gran" ${item.tamanio === "gran" ? "selected" : ""}>Grande</option>
+              </select>`;
+          }
+        }
+
+        if (modoEdicion) {
+          contenido += `<button type="button" onclick="eliminarItem('${tipo}', ${index})">Eliminar</button>`;
+        }
+
+        div.innerHTML = contenido;
+        container.appendChild(div);
+      });
+
+      if (modoEdicion) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.textContent = tipo === "promo" ? "Agregar promoción" : "Agregar ítem";
+        btn.onclick = () => agregarItem(tipo);
+        container.parentElement.appendChild(btn);
+      }
+    }
+
+    function actualizarTexto(tipo, index, campo, valor) {
+      if (!modoEdicion) return;
+      data[tipo][index][campo] = valor;
+      guardarData();
+    }
+
+    function actualizarPrecio(tipo, index, valor) {
+      if (!modoEdicion) return;
+      const limpio = parseFloat(valor.replace(/[^0-9.]/g, '')) || 0;
+      data[tipo][index].precioBase = limpio;
+      data[tipo][index].precio = tipo === "bebida"
+        ? calcularPrecioConTamanio(limpio, data[tipo][index].tamanio || "peque")
+        : limpio.toFixed(2);
+      guardarData();
+      renderItems(tipo);
+    }
+
+    function cambiarTamanio(tipo, index, seleccion) {
+      const item = data[tipo][index];
+      item.tamanio = seleccion;
+      item.precio = calcularPrecioConTamanio(item.precioBase || 0, seleccion);
+      guardarData();
+      renderItems(tipo);
+    }
+
+    function cambiarImagen(event, tipo, index) {
+      if (!modoEdicion) return;
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = e => {
+        data[tipo][index].img = e.target.result;
+        guardarData();
+        renderItems(tipo);
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function eliminarItem(tipo, index) {
+      if (!modoEdicion) return;
+      data[tipo].splice(index, 1);
+      guardarData();
+      renderItems(tipo);
+    }
+
+    function agregarItem(tipo) {
+      if (!modoEdicion) return;
+      const nuevo = {
+        nombre: "Nuevo ítem",
+        descripcion: "Descripción aquí",
+        precio: tipo === "promo" ? "" : "0.00",
+        precioBase: tipo === "promo" ? undefined : 0.00,
+        img: ""
+      };
+      if (tipo === "bebida") nuevo.tamanio = "peque";
+      data[tipo].push(nuevo);
+      guardarData();
+      renderItems(tipo);
+    }
+
+    function cambiarPortada(input) {
+      if (!modoEdicion) return;
+      const file = input.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = e => {
+        document.getElementById("heroImg").style.backgroundImage = `url('${e.target.result}')`;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function cambiarLogo(input) {
+      if (!modoEdicion) return;
+      const file = input.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = e => {
+        document.getElementById("logoPreview").src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function solicitarAcceso() {
+      const usuario = prompt("Ingrese usuario:");
+      if (usuario !== "Martin Villagra") return alert("Usuario incorrecto.");
+      const contrasena = prompt("Ingrese contraseña:");
+      if (contrasena !== "MartincitoV2025") return alert("Contraseña incorrecta.");
+
+      modoEdicion = true;
+      alert("Acceso concedido. Ya puede editar la carta.");
+
+      // Input para cambiar logo
+      let inputLogo = document.createElement("input");
+      inputLogo.type = "file";
+      inputLogo.accept = "image/*";
+      inputLogo.style.display = "none";
+      inputLogo.onchange = () => cambiarLogo(inputLogo);
+      document.getElementById("logoContainer").appendChild(inputLogo);
+      document.getElementById("logoContainer").onclick = () => inputLogo.click();
+
+      // Input para cambiar portada
+      let inputHero = document.createElement("input");
+      inputHero.type = "file";
+      inputHero.accept = "image/*";
+      inputHero.style.display = "none";
+      inputHero.onchange = () => cambiarPortada(inputHero);
+      document.getElementById("heroImg").appendChild(inputHero);
+      document.getElementById("heroImg").onclick = () => inputHero.click();
+
+      renderItems("promo");
+      renderItems("comida");
+      renderItems("bebida");
+    }
+
+    renderItems("promo");
+    renderItems("comida");
+    renderItems("bebida");
+  </script>
+</body>
+</html>
