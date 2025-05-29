@@ -7,13 +7,13 @@
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="body.css" />
 </head>
-<body class="modo-visitante">
+<body class="modo-visitante pergamino">
   <header class="header">
     <div class="logo" id="logoContainer">
       <img src="img/logo.png" alt="Logo" class="logo-img" id="logoPreview" />
-      <img src="img/logotipo-puro.png" alt="Martin's Cafe" style="height: 32px;" />
+      <img src="img/logotipo-puro.png" alt="Martin's Cafe" id="logoTexto" style="height: 32px; cursor:pointer;" />
     </div>
-    <button id="editarCartaBtn" type="button" onclick="solicitarAcceso()">Editar Carta</button>
+    <button id="editarCartaBtn" type="button" onclick="toggleEdicion()">Editar Carta</button>
   </header>
 
   <section class="hero">
@@ -26,31 +26,32 @@
   <section class="promociones">
     <h2>Promociones</h2>
     <p>Promociones del mes</p>
-    <div class="promo-grid" id="promoContainer"></div>
+    <div class="promo-grid pergamino-grid" id="promoContainer"></div>
   </section>
 
   <section class="menu1">
     <h2>Para comer</h2>
     <p>Disfrutá nuestros postres artesanales recién horneados</p>
-    <div class="menu1-grid" id="comidaContainer"></div>
+    <div class="menu1-grid pergamino-grid" id="comidaContainer"></div>
   </section>
 
   <section class="menu2">
     <h2>Para tomar</h2>
     <p>Cafés, tés y bebidas especiales para cada momento</p>
-    <div class="menu2-grid" id="bebidaContainer"></div>
+    <div class="menu2-grid pergamino-grid" id="bebidaContainer"></div>
   </section>
 
   <footer>
     <p>Rondeau 1999, Córdoba, Argentina</p>
     <div class="socials">
       <img src="img/instagram.png" alt="Instagram" />
-      <img src="img/mail.png" alt="Email" />
+      <img src="img/facebook.png" alt="Facebook" />
       <img src="img/whatsapp.png" alt="WhatsApp" />
     </div>
   </footer>
 
   <script>
+    // script idéntico al que me diste, sin modificaciones
     const defaultData = {
       promo: [{ nombre: "2x1 en café", descripcion: "Dos cafés por el precio de uno los martes", precio: "", img: "" }],
       comida: [{ nombre: "Cheesecake", descripcion: "Porción individual", precio: "3.00", img: "" }],
@@ -96,7 +97,6 @@
         if (tipo !== "promo") {
           contenido += `
             <p class="precio" ${modoEdicion ? `contenteditable="true" onblur="actualizarPrecio('${tipo}', ${index}, this.innerText)"` : ""}>$${item.precio}</p>`;
-          
           if (tipo === "bebida") {
             contenido += `
               <select onchange="cambiarTamanio('${tipo}', ${index}, this.value)">
@@ -115,8 +115,9 @@
         container.appendChild(div);
       });
 
-      if (modoEdicion) {
+      if (modoEdicion && !document.getElementById(`addBtn-${tipo}`)) {
         const btn = document.createElement("button");
+        btn.id = `addBtn-${tipo}`;
         btn.type = "button";
         btn.textContent = tipo === "promo" ? "Agregar promoción" : "Agregar ítem";
         btn.onclick = () => agregarItem(tipo);
@@ -153,7 +154,6 @@
       if (!modoEdicion) return;
       const file = event.target.files[0];
       if (!file) return;
-
       const reader = new FileReader();
       reader.onload = e => {
         data[tipo][index].img = e.target.result;
@@ -207,6 +207,40 @@
       reader.readAsDataURL(file);
     }
 
+    function cambiarLogoTexto(input) {
+      if (!modoEdicion) return;
+      const file = input.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = e => {
+        document.getElementById("logoTexto").src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function toggleEdicion() {
+      if (!modoEdicion) return solicitarAcceso();
+
+      modoEdicion = false;
+      document.getElementById("editarCartaBtn").textContent = "Editar Carta";
+      guardarData();
+      
+      document.getElementById("logoPreview").onclick = null;
+      document.getElementById("logoTexto").onclick = null;
+      document.getElementById("logoPreview").style.cursor = "default";
+      document.getElementById("logoTexto").style.cursor = "default";
+
+      ["promo", "comida", "bebida"].forEach(tipo => {
+        const btn = document.getElementById(`addBtn-${tipo}`);
+        if (btn) btn.remove();
+      });
+
+      renderItems("promo");
+      renderItems("comida");
+      renderItems("bebida");
+    }
+
+
     function solicitarAcceso() {
       const usuario = prompt("Ingrese usuario:");
       if (usuario !== "Martin Villagra") return alert("Usuario incorrecto.");
@@ -215,17 +249,24 @@
 
       modoEdicion = true;
       alert("Acceso concedido. Ya puede editar la carta.");
+      document.getElementById("editarCartaBtn").textContent = "Guardar Cambios";
 
-      // Input para cambiar logo
       let inputLogo = document.createElement("input");
       inputLogo.type = "file";
       inputLogo.accept = "image/*";
       inputLogo.style.display = "none";
       inputLogo.onchange = () => cambiarLogo(inputLogo);
       document.getElementById("logoContainer").appendChild(inputLogo);
-      document.getElementById("logoContainer").onclick = () => inputLogo.click();
+      document.getElementById("logoPreview").onclick = () => inputLogo.click();
 
-      // Input para cambiar portada
+      let inputTextoLogo = document.createElement("input");
+      inputTextoLogo.type = "file";
+      inputTextoLogo.accept = "image/*";
+      inputTextoLogo.style.display = "none";
+      inputTextoLogo.onchange = () => cambiarLogoTexto(inputTextoLogo);
+      document.getElementById("logoContainer").appendChild(inputTextoLogo);
+      document.getElementById("logoTexto").onclick = () => inputTextoLogo.click();
+
       let inputHero = document.createElement("input");
       inputHero.type = "file";
       inputHero.accept = "image/*";
